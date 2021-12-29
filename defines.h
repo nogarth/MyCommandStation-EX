@@ -59,13 +59,18 @@
  #define BIG_RAM
 #endif 
 
-#if ENABLE_WIFI && defined(BIG_RAM)
-#define WIFI_ON true
-#ifndef WIFI_CHANNEL
-#define WIFI_CHANNEL 1
-#endif
+#if ENABLE_WIFI
+  #if defined(BIG_RAM)
+    #define WIFI_ON true
+    #ifndef WIFI_CHANNEL
+      #define WIFI_CHANNEL 1
+    #endif
+  #else
+    #define WIFI_WARNING
+    #define WIFI_ON false
+  #endif
 #else
-#define WIFI_ON false
+  #define WIFI_ON false
 #endif
 
 #if ENABLE_ETHERNET && defined(BIG_RAM)
