@@ -58,7 +58,6 @@
 #if (defined(ARDUINO_AVR_MEGA) || defined(ARDUINO_AVR_MEGA2560) || defined(ARDUINO_SAMD_ZERO)  || defined(TEENSYDUINO) || defined(ESP_FAMILY))
  #define BIG_RAM
 #endif 
-
 #if ENABLE_WIFI
   #if defined(BIG_RAM)
     #define WIFI_ON true
@@ -73,10 +72,15 @@
   #define WIFI_ON false
 #endif
 
-#if ENABLE_ETHERNET && defined(BIG_RAM)
-#define ETHERNET_ON true
+#if ENABLE_ETHERNET
+  #if defined(BIG_RAM)
+    #define ETHERNET_ON true
+  #else
+    #define ETHERNET_WARNING
+    #define ETHERNET_ON false
+  #endif
 #else
-#define ETHERNET_ON false
+  #define ETHERNET_ON false
 #endif
 
 #if WIFI_ON && ETHERNET_ON
