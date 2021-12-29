@@ -35,8 +35,8 @@ class RingStream : public Print {
     void mark(uint8_t b);
     bool commit();
     uint8_t peekTargetMark();
-    void info();
-
+    void printBuffer(Print * streamer);
+    void flush();
  private:
    int read(byte advance);
    int _len;
