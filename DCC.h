@@ -23,6 +23,16 @@
 #include "MotorDrivers.h"
 #include "FSH.h"
 
+#include "defines.h"
+#ifndef HIGHEST_SHORT_ADDR
+#define HIGHEST_SHORT_ADDR 127
+#else
+#if HIGHEST_SHORT_ADDR > 127
+#error short addr greater than 127 does not make sense
+#endif
+#endif
+const uint16_t LONG_ADDR_MARKER = 0x4000;
+
 typedef void (*ACK_CALLBACK)(int16_t result);
 
 enum ackOp : byte
@@ -89,8 +99,9 @@ public:
   static void writeCVBitMain(int cab, int cv, byte bNum, bool bValue);
   static void setFunction(int cab, byte fByte, byte eByte);
   static void setFn(int cab, int16_t functionNumber, bool on);
-  static int changeFn(int cab, int16_t functionNumber, bool pressed);
+  static void changeFn(int cab, int16_t functionNumber);
   static int  getFn(int cab, int16_t functionNumber);
+  static uint32_t getFunctionMap(int cab);
   static void updateGroupflags(byte &flags, int16_t functionNumber);
   static void setAccessory(int aAdd, byte aNum, bool activate);
   static bool writeTextPacket(byte *b, int nBytes);
@@ -124,7 +135,6 @@ public:
     return ackRetryPSum;
   };
 
-private:
   struct LOCO
   {
     int loco;
@@ -132,6 +142,9 @@ private:
     byte groupFlags;
     unsigned long functions;
   };
+ static LOCO speedTable[MAX_LOCOS];
+ 
+private:
   static byte joinRelay;
   static byte loopStatus;
   static void setThrottle2(uint16_t cab, uint8_t speedCode);
@@ -142,7 +155,6 @@ private:
   static FSH *shieldName;
   static byte globalSpeedsteps;
 
-  static LOCO speedTable[MAX_LOCOS];
   static byte cv1(byte opcode, int cv);
   static byte cv2(int cv);
   static int lookupSpeedTable(int locoId);

@@ -67,8 +67,11 @@ decide to ignore the <q ID> return and only react to <Q ID> triggers.
 **********************************************************************/
 
 #include "StringFormatter.h"
+#include "CommandDistributor.h"
 #include "Sensors.h"
+#ifndef DISABLE_EEPROM
 #include "EEStore.h"
+#endif
 #include "IODevice.h"
 
 
@@ -85,7 +88,7 @@ decide to ignore the <q ID> return and only react to <Q ID> triggers.
 // second part of the list is determined from by the 'firstPollSensor' pointer.
 ///////////////////////////////////////////////////////////////////////////////
 
-void Sensor::checkAll(Print *stream){
+void Sensor::checkAll(){
   uint16_t sensorCount = 0;
 
 #ifdef USE_NOTIFY
@@ -133,10 +136,8 @@ void Sensor::checkAll(Print *stream){
       readingSensor->active = readingSensor->inputState;
       readingSensor->latchDelay = minReadCount;  // Reset counter
       
-      if (stream != NULL) {
-        StringFormatter::send(stream, F("<%c %d>\n"), readingSensor->active ? 'Q' : 'q', readingSensor->data.snum);
-        pause = true;  // Don't check any more sensors on this entry
-      }
+      CommandDistributor::broadcastSensor(readingSensor->data.snum,readingSensor->active);
+      pause = true;  // Don't check any more sensors on this entry
     }
 
     // Move to next sensor in list.
@@ -275,7 +276,7 @@ bool Sensor::remove(int n){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
+#ifndef DISABLE_EEPROM
 void Sensor::load(){
   struct SensorData data;
   Sensor *tt;
@@ -303,7 +304,7 @@ void Sensor::store(){
     EEStore::eeStore->data.nSensors++;
   }
 }
-
+#endif
 ///////////////////////////////////////////////////////////////////////////////
 
 Sensor *Sensor::firstSensor=NULL;

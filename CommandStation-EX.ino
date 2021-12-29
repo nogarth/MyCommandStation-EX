@@ -45,11 +45,12 @@
  */
 
 #include "DCCEX.h"
-
-// Create a serial command parser for the USB connection, 
-// This supports JMRI or manual diagnostics and commands
-// to be issued from the USB serial console.
-DCCEXParser serialParser;
+#ifdef WIFI_WARNING
+#warning You have defined that you want WiFi but your hardware has not enough memory to do that, so WiFi DISABLED
+#endif   
+#ifdef ETHERNET_WARNING
+#warning You have defined that you want Ethernet but your hardware has not enough memory to do that, so Ethernet DISABLED
+#endif   
 
 void setup()
 {
@@ -95,7 +96,7 @@ void setup()
   // Invoke any DCC++EX commands in the form "SETUP("xxxx");"" found in optional file mySetup.h.  
   //  This can be used to create turnouts, outputs, sensors etc. through the normal text commands.
   #if __has_include ( "mySetup.h")
-        #define SETUP(cmd) serialParser.parse(F(cmd))  
+        #define SETUP(cmd) DCCEXParser::parse(F(cmd))  
         #include "mySetup.h"
         #undef SETUP
        #endif
@@ -106,6 +107,7 @@ void setup()
   #endif
 
   LCD(3,F("Ready")); 
+  CommandDistributor::broadcastPower();
 }
 
 void loop()
@@ -116,7 +118,7 @@ void loop()
   //                   (loco reminders and power checks)
   DCC::loop();
   // Responsibility 2: handle any incoming commands on USB connection
-  serialParser.loop(Serial);
+  SerialManager::loop();
 
 // Responsibility 3: Optionally handle any incoming WiFi traffic
 #if WIFI_ON
@@ -142,6 +144,8 @@ void loop()
   // Handle/update IO devices.
   IODevice::loop();
   
+  Sensor::checkAll(); // Update and print changes
+
   // Report any decrease in memory (will automatically trigger on first call)
   static int ramLowWatermark = __INT_MAX__; // replaced on first loop 
 #ifdef ESP_FAMILY

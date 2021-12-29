@@ -94,8 +94,12 @@
 //
 #define WIFI_SERIAL_LINK_SPEED 115200
 
-#if __has_include ( "myAutomation.h") && defined(BIG_RAM)
-  #define RMFT_ACTIVE
+#if __has_include ( "myAutomation.h")
+  #if defined(BIG_RAM) || defined(DISABLE_EEPROM)
+    #define RMFT_ACTIVE
+  #else
+    #warning You have myAutomation.h but your hardware has not enough memory to do that, so EX-RAIL DISABLED
+  #endif
 #endif
 
 #endif

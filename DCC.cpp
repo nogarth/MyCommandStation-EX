@@ -20,11 +20,14 @@
 #include "DIAG.h"
 #include "DCC.h"
 #include "DCCWaveform.h"
+#ifndef DISABLE_EEPROM
 #include "EEStore.h"
+#endif
 #include "GITHUB_SHA.h"
 #include "version.h"
 #include "FSH.h"
 #include "IODevice.h"
+#include "CommandDistributor.h"
 
 // This module is responsible for converting API calls into
 // messages to be sent to the waveform generator.
@@ -56,9 +59,11 @@ void DCC::begin(const FSH * motorShieldName, MotorDriver * mainDriver, MotorDriv
   // Initialise HAL layer before reading EEprom.
   IODevice::begin();
 
+#ifndef DISABLE_EEPROM
   // Load stuff from EEprom
   (void)EEPROM; // tell compiler not to warn this is unused
   EEStore::init();
+#endif
 
   DCCWaveform::begin(mainDriver,progDriver); 
 }
@@ -84,7 +89,7 @@ void DCC::setThrottle2( uint16_t cab, byte speedCode)  {
   uint8_t nB = 0;
   // DIAG(F("setSpeedInternal %d %x"),cab,speedCode);
   
-  if (cab > 127)
+  if (cab > HIGHEST_SHORT_ADDR)
     b[nB++] = highByte(cab) | 0xC0;    // convert train number into a two-byte address
   b[nB++] = lowByte(cab);
 
@@ -124,7 +129,7 @@ void DCC::setFunctionInternal(int cab, byte byte1, byte byte2) {
   byte b[4];
   byte nB = 0;
 
-  if (cab > 127)
+  if (cab > HIGHEST_SHORT_ADDR)
     b[nB++] = highByte(cab) | 0xC0;    // convert train number into a two-byte address
   b[nB++] = lowByte(cab);
   if (byte1!=0) b[nB++] = byte1;
@@ -153,7 +158,7 @@ void DCC::setFn( int cab, int16_t functionNumber, bool on) {
     //non reminding advanced binary bit set 
     byte b[5];
     byte nB = 0;
-    if (cab > 127)
+    if (cab > HIGHEST_SHORT_ADDR)
       b[nB++] = highByte(cab) | 0xC0;    // convert train number into a two-byte address
     b[nB++] = lowByte(cab);
     if (functionNumber <= 127) {
@@ -174,47 +179,28 @@ void DCC::setFn( int cab, int16_t functionNumber, bool on) {
 
   // Take care of functions:
   // Set state of function
+  unsigned long previous=speedTable[reg].functions;
   unsigned long funcmask = (1UL<<functionNumber);
-  if (on) {
+  if (on) { 
       speedTable[reg].functions |= funcmask;
   } else {
       speedTable[reg].functions &= ~funcmask;
   }
-  updateGroupflags(speedTable[reg].groupFlags, functionNumber);
-  return;
+  if (speedTable[reg].functions != previous) {
+    updateGroupflags(speedTable[reg].groupFlags, functionNumber);
+    CommandDistributor::broadcastLoco(reg);
+  }
 }
 
-// Change function according to how button was pressed,
-// typically in WiThrottle.
-// Returns new state or -1 if nothing was changed.
-int DCC::changeFn( int cab, int16_t functionNumber, bool pressed) {
-  int funcstate = -1;
-  if (cab<=0 || functionNumber>28) return funcstate;
+// Flip function state
+void DCC::changeFn( int cab, int16_t functionNumber) {
+  if (cab<=0 || functionNumber>28) return;
   int reg = lookupSpeedTable(cab);
-  if (reg<0) return funcstate;  
-
-  // Take care of functions:
-  // Imitate how many command stations do it: Button press is
-  // toggle but for F2 where it is momentary
+  if (reg<0) return;  
   unsigned long funcmask = (1UL<<functionNumber);
-  if (functionNumber == 2) {
-      // turn on F2 on press and off again at release of button
-      if (pressed) {
-	  speedTable[reg].functions |= funcmask;
-	  funcstate = 1;
-      } else {
-	  speedTable[reg].functions &= ~funcmask;
-	  funcstate = 0;
-      }
-  } else {
-      // toggle function on press, ignore release
-      if (pressed) {
-        speedTable[reg].functions ^= funcmask;
-      }
-      funcstate = (speedTable[reg].functions & funcmask)? 1 : 0;
-  }
-  updateGroupflags(speedTable[reg].groupFlags, functionNumber);
-  return funcstate;
+  speedTable[reg].functions ^= funcmask;
+	updateGroupflags(speedTable[reg].groupFlags, functionNumber);
+  CommandDistributor::broadcastLoco(reg);
 }
 
 int DCC::getFn( int cab, int16_t functionNumber) {
@@ -236,6 +222,12 @@ void DCC::updateGroupflags(byte & flags, int16_t functionNumber) {
   else if (functionNumber<=20) groupMask=FN_GROUP_4;
   else                         groupMask=FN_GROUP_5;
   flags |= groupMask; 
+}
+
+uint32_t DCC::getFunctionMap(int cab) {
+  if (cab<=0) return 0;  // unknown pretend all functions off
+  int reg = lookupSpeedTable(cab);
+  return (reg<0)?0:speedTable[reg].functions;  
 }
 
 void DCC::setAccessory(int address, byte number, bool activate) {
@@ -262,7 +254,7 @@ void DCC::setAccessory(int address, byte number, bool activate) {
 void DCC::writeCVByteMain(int cab, int cv, byte bValue)  {
   byte b[5];
   byte nB = 0;
-  if (cab > 127)
+  if (cab > HIGHEST_SHORT_ADDR)
     b[nB++] = highByte(cab) | 0xC0;    // convert train number into a two-byte address
 
   b[nB++] = lowByte(cab);
@@ -283,7 +275,7 @@ void DCC::writeCVBitMain(int cab, int cv, byte bNum, bool bValue)  {
   bValue = bValue % 2;
   bNum = bNum % 8;
 
-  if (cab > 127)
+  if (cab > HIGHEST_SHORT_ADDR)
     b[nB++] = highByte(cab) | 0xC0;    // convert train number into a two-byte address
 
   b[nB++] = lowByte(cab);
@@ -548,7 +540,7 @@ void DCC::setLocoId(int id,ACK_CALLBACK callback) {
     callback(-1);
     return;
   }
-  if (id<=127)
+  if (id<=HIGHEST_SHORT_ADDR)
       ackManagerSetup(id, SHORT_LOCO_ID_PROG, callback);
   else
       ackManagerSetup(id | 0xc000,LONG_LOCO_ID_PROG, callback);
@@ -663,6 +655,7 @@ int DCC::lookupSpeedTable(int locoId) {
         speedTable[reg].speedCode=128;  // default direction forward
         speedTable[reg].groupFlags=0;
         speedTable[reg].functions=0;
+        CommandDistributor::broadcastLoco(reg);
   }
   return reg;
 }
@@ -672,14 +665,22 @@ void  DCC::updateLocoReminder(int loco, byte speedCode) {
   if (loco==0) {
      // broadcast stop/estop but dont change direction
      for (int reg = 0; reg < MAX_LOCOS; reg++) {
-       speedTable[reg].speedCode = (speedTable[reg].speedCode & 0x80) |  (speedCode & 0x7f);
+       if (speedTable[reg].loco==0) continue;
+       byte newspeed=(speedTable[reg].speedCode & 0x80) |  (speedCode & 0x7f);
+       if (speedTable[reg].speedCode != newspeed) {
+         speedTable[reg].speedCode = newspeed;
+         CommandDistributor::broadcastLoco(reg);
+       }
      }
      return; 
   }
   
   // determine speed reg for this loco
   int reg=lookupSpeedTable(loco);       
-  if (reg>=0) speedTable[reg].speedCode = speedCode;
+  if (reg>=0 && speedTable[reg].speedCode!=speedCode) {
+    speedTable[reg].speedCode = speedCode;
+    CommandDistributor::broadcastLoco(reg);
+  }
 }
 
 DCC::LOCO DCC::speedTable[MAX_LOCOS];
@@ -906,7 +907,7 @@ void DCC::ackManagerLoop() {
           
      case COMBINELOCOID: 
           // ackManagerStash is  cv17, ackManagerByte is CV 18
-          callback( ackManagerByte + ((ackManagerStash - 192) << 8));
+          callback( LONG_ADDR_MARKER | ( ackManagerByte + ((ackManagerStash - 192) << 8)));
           return;            
 
      case ITSKIP:

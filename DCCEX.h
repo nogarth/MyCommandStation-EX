@@ -29,6 +29,7 @@
 #include "DCC.h"
 #include "DIAG.h"
 #include "DCCEXParser.h"
+#include "SerialManager.h"
 #include "version.h"
 #if defined(ARDUINO_ARCH_ESP8266)
 #include "WifiESP8266.h"

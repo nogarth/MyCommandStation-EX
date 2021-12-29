@@ -24,6 +24,8 @@
 struct MYLOCO {
     char throttle; //indicates which throttle letter on client, often '0','1' or '2'
     int cab; //address of this loco
+    bool broadcastPending;
+    uint32_t functionMap;
 };
 
 class WiThrottle {
@@ -31,14 +33,15 @@ class WiThrottle {
     static void loop(RingStream * stream);
     void parse(RingStream * stream, byte * cmd);
     static WiThrottle* getThrottle( int wifiClient); 
-    
+    static void markForBroadcast(int cab);
+      
   private: 
     WiThrottle( int wifiClientId);
     ~WiThrottle();
    
       static const int MAX_MY_LOCO=10;      // maximum number of locos assigned to a single client
-      static const int HEARTBEAT_SECONDS=4; // heartbeat at 4secs to provide messaging transport
-      static const int ESTOP_SECONDS=8;     // eStop if no incoming messages for more than 8secs
+      static const int HEARTBEAT_SECONDS=10; // heartbeat at 4secs to provide messaging transport
+      static const int ESTOP_SECONDS=20;     // eStop if no incoming messages for more than 8secs
       static WiThrottle* firstThrottle;
       static int getInt(byte * cmd);
       static int getLocoId(byte * cmd);
@@ -62,8 +65,8 @@ class WiThrottle {
       void multithrottle(RingStream * stream, byte * cmd);
       void locoAction(RingStream * stream, byte* aval, char throttleChar, int cab);
       void accessory(RingStream *, byte* cmd);
-      void checkHeartbeat(); 
-
+      void checkHeartbeat(RingStream * stream); 
+      void markForBroadcast2(int cab);
        // callback stuff to support prog track acquire
        static RingStream * stashStream;
        static WiThrottle * stashInstance;
