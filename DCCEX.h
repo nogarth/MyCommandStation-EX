@@ -48,11 +48,6 @@
 #include "Sensors.h"
 #include "Outputs.h"
 #include "RMFT.h"
-
-// not yet in this branch
-//#if __has_include ( "myAutomation.h")
-//  #include "RMFT.h"
-//  #define RMFT_ACTIVE
-//#endif
+#include "CommandDistributor.h"
     
 #endif
