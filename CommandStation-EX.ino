@@ -57,10 +57,7 @@ void setup()
 
   // Responsibility 1: Start the usb connection for diagnostics
   // This is normally Serial but uses SerialUSB on a SAMD processor
-  Serial.begin(115200);
-#ifdef ESP_DEBUG
-  Serial.setDebugOutput(true);
-#endif
+  SerialManager::init();
 
   DIAG(F("License GPLv3 fsf.org (c) dcc-ex.com"));
 
