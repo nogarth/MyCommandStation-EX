@@ -22,8 +22,21 @@
 #include "DIAG.h"
 #if defined(ARDUINO_ARCH_ESP32)
 #include <driver/adc.h>
+#include <soc/sens_reg.h>
+#include <soc/sens_struct.h>
 #define pinToADC1Channel(X) (adc1_channel_t)(((X) > 35) ? (X)-36 : (X)-28)
 #endif
+
+int IRAM_ATTR local_adc1_read(int channel) {
+    uint16_t adc_value;
+    SENS.sar_meas_start1.sar1_en_pad = (1 << channel); // only one channel is selected
+    while (SENS.sar_slave_addr1.meas_status != 0);
+    SENS.sar_meas_start1.meas1_start_sar = 0;
+    SENS.sar_meas_start1.meas1_start_sar = 1;
+    while (SENS.sar_meas_start1.meas1_done_sar == 0);
+    adc_value = SENS.sar_meas_start1.meas1_data_sar;
+    return adc_value;
+}
 
 bool MotorDriver::usePWM=false;
 bool MotorDriver::commonFaultPin=false;
@@ -162,7 +175,7 @@ int MotorDriver::getCurrentRaw() {
   overflow_count = 0;
   SREG = sreg_backup;    /* restore interrupt state */
 #elif defined(ARDUINO_ARCH_ESP32)
-  current = adc1_get_raw(pinToADC1Channel(currentPin))-senseOffset;
+  current = local_adc1_read(pinToADC1Channel(currentPin))-senseOffset;  // adc1_get_raw
 #else
   current = analogRead(currentPin)-senseOffset;
 #endif
